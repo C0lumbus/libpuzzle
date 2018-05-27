@@ -8,6 +8,16 @@
 #include <puzzle.h>
 #include "php_libpuzzle.h"
 
+/* Compatibility layer */
+#if PHP_MAJOR_VERSION < 7
+#define RV_STRINGL(s,l) RETVAL_STRINGL(s, l, 1);
+typedef int strsize_t;
+typedef long zend_long;
+#else
+#define RV_STRINGL(s,l) RETVAL_STRINGL(s, l);
+typedef size_t strsize_t;
+#endif
+
 ZEND_DECLARE_MODULE_GLOBALS(libpuzzle)
 
 /* True global resources - no need for thread safety here */
@@ -122,7 +132,7 @@ PHP_MINFO_FUNCTION(libpuzzle)
 PHP_FUNCTION(puzzle_fill_cvec_from_file)
 {    
     char *arg = NULL;
-    int arg_len;
+    strsize_t arg_len;
     PuzzleContext *context;
     PuzzleCvec cvec;
     
@@ -137,7 +147,7 @@ PHP_FUNCTION(puzzle_fill_cvec_from_file)
         puzzle_free_cvec(context, &cvec);
         RETURN_FALSE;
     }
-    RETVAL_STRINGL(cvec.vec, cvec.sizeof_vec, 1);
+    RV_STRINGL((char *)cvec.vec, cvec.sizeof_vec);
     puzzle_free_cvec(context, &cvec);
 }
 /* }}} */
@@ -147,7 +157,7 @@ PHP_FUNCTION(puzzle_fill_cvec_from_file)
 PHP_FUNCTION(puzzle_compress_cvec)
 {    
     char *arg = NULL;
-    int arg_len;
+    strsize_t arg_len;
     PuzzleContext *context;
     PuzzleCompressedCvec compressed_cvec;
     PuzzleCvec cvec;
@@ -161,15 +171,16 @@ PHP_FUNCTION(puzzle_compress_cvec)
     puzzle_init_compressed_cvec(context, &compressed_cvec);
     puzzle_init_cvec(context, &cvec);
     cvec.vec = arg;
-    cvec.sizeof_vec = (size_t) arg_len;    
+    cvec.vec = (signed char *)arg;
     if (puzzle_compress_cvec(context, &compressed_cvec, &cvec) != 0) {
         puzzle_free_compressed_cvec(context, &compressed_cvec);
         cvec.vec = NULL;
         puzzle_free_cvec(context, &cvec);        
         RETURN_FALSE;
     }
-    RETVAL_STRINGL(compressed_cvec.vec,
-                   compressed_cvec.sizeof_compressed_vec, 1);
+
+    RV_STRINGL((char *)compressed_cvec.vec,
+                   compressed_cvec.sizeof_compressed_vec);
     puzzle_free_compressed_cvec(context, &compressed_cvec);
     cvec.vec = NULL;
     puzzle_free_cvec(context, &cvec);    
@@ -181,7 +192,7 @@ PHP_FUNCTION(puzzle_compress_cvec)
 PHP_FUNCTION(puzzle_uncompress_cvec)
 {    
     char *arg = NULL;
-    int arg_len;
+    strsize_t arg_len;
     PuzzleContext *context;
     PuzzleCompressedCvec compressed_cvec;
     PuzzleCvec cvec;
@@ -194,7 +205,7 @@ PHP_FUNCTION(puzzle_uncompress_cvec)
     }
     puzzle_init_compressed_cvec(context, &compressed_cvec);
     puzzle_init_cvec(context, &cvec);
-    compressed_cvec.vec = arg;
+    compressed_cvec.vec = (unsigned char *)arg;
     compressed_cvec.sizeof_compressed_vec = (size_t) arg_len;    
     if (puzzle_uncompress_cvec(context, &compressed_cvec, &cvec) != 0) {
         puzzle_free_cvec(context, &cvec);
@@ -202,7 +213,7 @@ PHP_FUNCTION(puzzle_uncompress_cvec)
         puzzle_free_compressed_cvec(context, &compressed_cvec);
         RETURN_FALSE;
     }
-    RETVAL_STRINGL(cvec.vec, cvec.sizeof_vec, 1);
+    RV_STRINGL((char *)cvec.vec, cvec.sizeof_vec);
     puzzle_free_cvec(context, &cvec);
     compressed_cvec.vec = NULL;
     puzzle_free_compressed_cvec(context, &compressed_cvec);    
@@ -214,7 +225,7 @@ PHP_FUNCTION(puzzle_uncompress_cvec)
 PHP_FUNCTION(puzzle_vector_normalized_distance)
 {    
     char *vec1 = NULL, *vec2 = NULL;
-    int vec1_len, vec2_len;
+    strsize_t vec1_len, vec2_len;
     PuzzleContext *context;
     PuzzleCvec cvec1, cvec2;
     double d;
@@ -232,9 +243,9 @@ PHP_FUNCTION(puzzle_vector_normalized_distance)
     }
     puzzle_init_cvec(context, &cvec1);
     puzzle_init_cvec(context, &cvec2);    
-    cvec1.vec = vec1;
+    cvec1.vec = (signed char *)vec1;
     cvec1.sizeof_vec = (size_t) vec1_len;
-    cvec2.vec = vec2;
+    cvec2.vec = (signed char *)vec2;
     cvec2.sizeof_vec = (size_t) vec2_len;
     d = puzzle_vector_normalized_distance(context, &cvec1, &cvec2,
                                           (int) fix_for_texts);
@@ -250,7 +261,7 @@ PHP_FUNCTION(puzzle_vector_normalized_distance)
 PHP_FUNCTION(puzzle_set_max_width)
 {
     PuzzleContext *context;
-    long width;
+    zend_long width;
     
     context = &LIBPUZZLE_G(global_context);
     if (zend_parse_parameters
@@ -270,7 +281,7 @@ PHP_FUNCTION(puzzle_set_max_width)
 PHP_FUNCTION(puzzle_set_max_height)
 {
     PuzzleContext *context;
-    long height;
+    zend_long height;
     
     context = &LIBPUZZLE_G(global_context);
     if (zend_parse_parameters
@@ -290,7 +301,7 @@ PHP_FUNCTION(puzzle_set_max_height)
 PHP_FUNCTION(puzzle_set_lambdas)
 {
     PuzzleContext *context;
-    long lambdas;
+    zend_long lambdas;
     
     context = &LIBPUZZLE_G(global_context);
     if (zend_parse_parameters
